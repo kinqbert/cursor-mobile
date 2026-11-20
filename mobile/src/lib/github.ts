@@ -18,6 +18,8 @@ export async function setGithubToken(next: string | null) {
   listeners.forEach((l) => l());
 }
 
+export const hasGithubToken = () => !!token;
+
 export function useHasGithub() {
   return useSyncExternalStore(
     (l) => {

@@ -3,9 +3,11 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { hasGithubToken } from './github';
 import { queryClient } from './query';
 import { kv, secrets } from './storage';
 
@@ -132,7 +134,8 @@ function route(response: Notifications.NotificationResponse) {
     kind?: string;
   };
   if (response.actionIdentifier === 'review' && data.prUrl && data.agentId) {
-    router.push({ pathname: '/pr', params: { url: data.prUrl, agentId: data.agentId } });
+    if (hasGithubToken()) router.push({ pathname: '/pr', params: { url: data.prUrl, agentId: data.agentId } });
+    else WebBrowser.openBrowserAsync(data.prUrl);
   } else if (data.agentId) {
     router.push({ pathname: '/agent/[id]', params: { id: data.agentId } });
   } else {

@@ -37,6 +37,7 @@ import { Text } from '@/components/ui/text';
 import { cursor } from '@/lib/api/endpoints';
 import type { ConversationMessage } from '@/lib/api/types';
 import { agentPhase, duration, relativeTime, repoName, resultFingerprint } from '@/lib/format';
+import { useHasGithub } from '@/lib/github';
 import { useAgentSummary, useArchiveAgent } from '@/lib/hooks';
 import { useSeen } from '@/lib/local-state';
 import { qk } from '@/lib/query';
@@ -50,6 +51,7 @@ export default function AgentScreen() {
   const summary = useAgentSummary(id);
   const archive = useArchiveAgent();
   const { markSeen } = useSeen();
+  const hasGithub = useHasGithub();
 
   const [pendingRun, setPendingRun] = useState(!!prompt);
   const [pendingMessages, setPendingMessages] = useState<string[]>(prompt ? [prompt] : []);
@@ -110,7 +112,11 @@ export default function AgentScreen() {
   const prUrl = summary.data?.target?.prUrl ?? run.data?.git?.branches.find((b) => b.prUrl)?.prUrl;
   const webUrl = summary.data?.target?.url ?? agent.data?.url ?? `https://cursor.com/agents/${id}`;
 
-  const openPr = (url: string) => router.push({ pathname: '/pr', params: { url, agentId: id } });
+  // With a GitHub token → in-app PR screen; without one → straight to the browser.
+  const openPr = (url: string) =>
+    hasGithub
+      ? router.push({ pathname: '/pr', params: { url, agentId: id } })
+      : WebBrowser.openBrowserAsync(url);
 
   const stop = async () => {
     const runId = latestRunId ?? (await cursor.agent(id)).latestRunId;
