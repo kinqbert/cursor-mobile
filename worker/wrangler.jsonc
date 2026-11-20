@@ -1,16 +1,27 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cursor-mobile-push",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-11-01",
-  "observability": { "enabled": true },
-  // Every minute: diff agent statuses and hold live streams on running agents.
-  "triggers": { "crons": ["* * * * *"] },
-  // No id: Wrangler provisions the namespace automatically on first deploy.
-  "kv_namespaces": [{ "binding": "STATE" }]
-  // Secrets (set with `npx wrangler secret put <NAME>`):
-  //   CURSOR_API_KEY  – your Cursor API key
-  //   APP_SECRET      – any long random string; paste the same value in the app
-  //   GITHUB_TOKEN    – optional, adds +/- stats to notifications
-  //   WEBHOOK_SECRET  – optional, for Cursor v0 webhooks
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cursor-mobile-push",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-01",
+	"observability": {
+		"enabled": true
+	},
+	// Every minute: diff agent statuses and hold live streams on running agents.
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
+	// KV namespace created by the first deploy (keeps device tokens + agent state).
+	"kv_namespaces": [
+		{
+			"binding": "STATE",
+			"id": "ff8613e06b2c434faab72dc9c51a59c6"
+		}
+	]
+	// Secrets (set with `npx wrangler secret put <NAME>`):
+	//   CURSOR_API_KEY  – your Cursor API key
+	//   APP_SECRET      – any long random string; paste the same value in the app
+	//   GITHUB_TOKEN    – optional, adds +/- stats to notifications
+	//   WEBHOOK_SECRET  – optional, for Cursor v0 webhooks
 }
