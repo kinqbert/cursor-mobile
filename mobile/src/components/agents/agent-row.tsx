@@ -1,4 +1,4 @@
-import { GitPullRequest } from 'lucide-react-native';
+import { Check, CircleDashed, GitMerge, GitPullRequest, X } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { StatusDot, type DotState } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import type { AgentV0 } from '@/lib/api/types';
 import { agentPhase, relativeTime, repoName, statusLabel } from '@/lib/format';
+import { usePr } from '@/lib/pr-hooks';
 import { space, useColors } from '@/theme';
 
 type Props = {
@@ -45,15 +46,13 @@ export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, o
             {repoName(agent.source?.repository)}
             {' · '}
           </Text>
-          {label === 'PR open' ? (
-            <GitPullRequest size={13} color={colors.success} strokeWidth={2} style={{ marginRight: 4 }} />
-          ) : null}
-          <Text
-            variant="meta"
-            color={phase === 'error' ? 'danger' : label === 'PR open' ? 'success' : 'textSecondary'}
-            numberOfLines={1}>
-            {label}
-          </Text>
+          {label === 'PR open' && agent.target?.prUrl ? (
+            <PrMeta prUrl={agent.target.prUrl} />
+          ) : (
+            <Text variant="meta" color={phase === 'error' ? 'danger' : 'textSecondary'} numberOfLines={1}>
+              {label}
+            </Text>
+          )}
           <Text variant="meta" color="textTertiary" numberOfLines={1}>
             {' · '}
             {relativeTime(agent.createdAt)}
@@ -63,6 +62,63 @@ export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, o
     </Pressable>
   );
 });
+
+/** "✓ Passed · +8 -23" / "Merged" from GitHub; falls back to "PR open" without a token. */
+function PrMeta({ prUrl }: { prUrl: string }) {
+  const colors = useColors();
+  const { pr, checks } = usePr(prUrl);
+  if (!pr.data) {
+    return (
+      <>
+        <GitPullRequest size={13} color={colors.success} strokeWidth={2} style={{ marginRight: 4 }} />
+        <Text variant="meta" color="success">
+          PR open
+        </Text>
+      </>
+    );
+  }
+  if (pr.data.merged || pr.data.state === 'closed') {
+    return (
+      <>
+        <GitMerge size={13} color={colors.textSecondary} strokeWidth={2} style={{ marginRight: 4 }} />
+        <Text variant="meta" color="textSecondary">
+          {pr.data.merged ? 'Merged' : 'Closed'}
+        </Text>
+      </>
+    );
+  }
+  const sum = checks.data?.summary;
+  const state = !sum || !sum.total ? null : sum.failed ? 'failed' : sum.running ? 'running' : 'passed';
+  return (
+    <>
+      {state === 'passed' ? (
+        <>
+          <Check size={14} color={colors.success} strokeWidth={2.25} style={{ marginRight: 4 }} />
+          <Text variant="meta" color="textSecondary">
+            Passed ·{' '}
+          </Text>
+        </>
+      ) : state === 'failed' ? (
+        <>
+          <X size={14} color={colors.danger} strokeWidth={2.25} style={{ marginRight: 4 }} />
+          <Text variant="meta" color="danger">
+            Failed ·{' '}
+          </Text>
+        </>
+      ) : state === 'running' ? (
+        <>
+          <CircleDashed size={13} color={colors.warning} style={{ marginRight: 4 }} />
+          <Text variant="meta" color="textSecondary">
+            Checks ·{' '}
+          </Text>
+        </>
+      ) : null}
+      <Text variant="meta" color="textSecondary">
+        +{pr.data.additions} -{pr.data.deletions}
+      </Text>
+    </>
+  );
+}
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', paddingLeft: space.xl },

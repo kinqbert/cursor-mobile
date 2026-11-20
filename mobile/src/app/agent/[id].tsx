@@ -110,6 +110,8 @@ export default function AgentScreen() {
   const prUrl = summary.data?.target?.prUrl ?? run.data?.git?.branches.find((b) => b.prUrl)?.prUrl;
   const webUrl = summary.data?.target?.url ?? agent.data?.url ?? `https://cursor.com/agents/${id}`;
 
+  const openPr = (url: string) => router.push({ pathname: '/pr', params: { url, agentId: id } });
+
   const stop = async () => {
     const runId = latestRunId ?? (await cursor.agent(id)).latestRunId;
     if (!runId) return;
@@ -133,7 +135,7 @@ export default function AgentScreen() {
 
   const menu: MenuItem[] = [
     ...(prUrl
-      ? [{ label: 'Open pull request', icon: GitPullRequest, onPress: () => WebBrowser.openBrowserAsync(prUrl) }]
+      ? [{ label: 'Open pull request', icon: GitPullRequest, onPress: () => openPr(prUrl) }]
       : []),
     { label: 'Open on web', icon: ExternalLink, onPress: () => WebBrowser.openBrowserAsync(webUrl) },
     { label: 'Copy link', icon: Link2, onPress: () => Clipboard.setStringAsync(webUrl) },
@@ -160,7 +162,7 @@ export default function AgentScreen() {
               <RoundButton
                 icon={GitPullRequest}
                 accessibilityLabel="Pull request"
-                onPress={() => WebBrowser.openBrowserAsync(prUrl)}
+                onPress={() => openPr(prUrl)}
               />
             ) : null}
             <RoundButton icon={MoreHorizontal} accessibilityLabel="More" onPress={() => setMenuOpen(true)} />
@@ -189,7 +191,7 @@ export default function AgentScreen() {
             </Text>
             {prUrl ? (
               <Pressable
-                onPress={() => WebBrowser.openBrowserAsync(prUrl)}
+                onPress={() => openPr(prUrl)}
                 style={[styles.pill, { backgroundColor: colors.successSoft }]}>
                 <Text variant="caption" color="success">
                   PR #{prUrl.split('/').pop()}

@@ -63,6 +63,7 @@ function RootStack({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Protected guard={signedIn}>
           <Stack.Screen name="agent/[id]" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="pr" />
           <Stack.Screen
             name="new"
             options={{
