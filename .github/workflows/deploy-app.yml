@@ -1,0 +1,66 @@
+name: Deploy app
+
+# On every push to main that touches the app:
+#  - JS-only change  → publish an over-the-air update (installed app picks it up on next launch)
+#  - native change   → also start a new APK build (fingerprint runtime version changed)
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/deploy-app.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: npm run typecheck
+
+      # google-services.json is git-ignored (public repo). Its contents are part of the
+      # native fingerprint, so CI must have the same file the EAS build used.
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_B64" ]; then echo "::error::GOOGLE_SERVICES_JSON_B64 secret is missing"; exit 1; fi
+          echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > google-services.json
+
+      - name: Resolve runtime version (native fingerprint)
+        id: runtime
+        run: |
+          RV=$(npx expo-updates runtimeversion:resolve --platform android | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s.slice(s.indexOf("{"))).runtimeVersion))')
+          echo "Runtime version: $RV"
+          echo "value=$RV" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK if no build exists for this runtime
+        run: |
+          BUILDS=$(eas build:list --platform android --build-profile preview --runtime-version "${{ steps.runtime.outputs.value }}" --limit 10 --json --non-interactive)
+          ACTIVE=$(echo "$BUILDS" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).filter(b=>!["ERRORED","CANCELED"].includes(b.status)).length))')
+          if [ "$ACTIVE" = "0" ]; then
+            echo "Native code changed → starting a new build. Install it from the link in the Expo dashboard."
+            eas build --profile preview --platform android --non-interactive --no-wait
+          else
+            echo "A build for this runtime already exists → update only."
+          fi
+
+      - name: Publish over-the-air update
+        env:
+          MESSAGE: ${{ github.event.head_commit.message || 'Manual deploy' }}
+        run: eas update --channel preview --environment preview --platform android --message "${MESSAGE%%$'\n'*}" --non-interactive

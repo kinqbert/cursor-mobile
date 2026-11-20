@@ -72,6 +72,14 @@
         "projectId": "8619cc9a-ce82-48b0-8471-5c1136159aa7"
       }
     },
-    "owner": "kinqbert"
+    "owner": "kinqbert",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8619cc9a-ce82-48b0-8471-5c1136159aa7",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }
