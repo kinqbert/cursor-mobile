@@ -4,6 +4,10 @@ import { notifyRunEnded, updateActiveSummary } from './notify';
 import { addToken, getTokens, removeTokens, sendPush } from './push';
 
 const STATE_KEY = 'agent-status';
+const WATCH_KEY = 'watching';
+const WATCH_TTL_MS = 3 * 60 * 60_000; // give up on an explicitly watched agent after 3 h
+
+type WatchEntry = { id: string; until: number };
 const MAX_WATCHED = 8; // keeps us well under 50 subrequests per invocation on the free plan
 const WATCH_MS = 55_000; // next cron fires at +60s, so coverage is near-continuous
 
@@ -13,7 +17,9 @@ export default {
    * 1. List agents and diff against last tick → notify agents that stopped working
    *    (fallback path, ≤60 s latency, also catches anything the streams missed).
    * 2. Update the "N Active" summary notification when the set changes.
-   * 3. Hold each running agent's SSE stream for ~55 s → notify the instant it ends.
+   * 3. Check agents the app explicitly asked us to watch (launched / followed up from the
+   *    phone) by their latest run, so even sub-minute runs are never missed.
+   * 4. Hold each running agent's SSE stream for ~55 s → notify the instant it ends.
    */
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const started = Date.now();
@@ -32,17 +38,19 @@ export default {
     if (JSON.stringify(prev) !== JSON.stringify(next)) await env.STATE.put(STATE_KEY, JSON.stringify(next));
     await updateActiveSummary(env, agents).catch(logError);
 
-    const running = agents.filter((a) => isWorking(a.status)).slice(0, MAX_WATCHED);
+    const running = new Map(agents.filter((a) => isWorking(a.status)).map((a) => [a.id, a.name]));
+    await checkWatched(env, running).catch(logError);
+
     const deadline = started + WATCH_MS;
     await Promise.all(
-      running.map(async (a) => {
-        const status = await waitForTerminal(env, a.id, deadline);
-        if (status) await notifyRunEnded(env, a.id, status, a.name).catch(logError);
+      [...running].slice(0, MAX_WATCHED).map(async ([id, name]) => {
+        const status = await waitForTerminal(env, id, deadline);
+        if (status) await notifyRunEnded(env, id, status, name).catch(logError);
       }),
     );
   },
 
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
 
     if (url.pathname === '/webhook' && req.method === 'POST') return handleWebhook(req, env);
@@ -65,6 +73,21 @@ export default {
         if (token) await removeTokens(env, [token]);
         return json({ ok: true });
       }
+      case 'POST /watch': {
+        // Sent by the app right after launching an agent or sending a follow-up.
+        const { agentId } = (await req.json()) as { agentId?: string };
+        if (!agentId) return json({ error: 'agentId required' }, 400);
+        const list = (await env.STATE.get<WatchEntry[]>(WATCH_KEY, 'json')) ?? [];
+        const next = [...list.filter((w) => w.id !== agentId && w.until > Date.now()), { id: agentId, until: Date.now() + WATCH_TTL_MS }];
+        await env.STATE.put(WATCH_KEY, JSON.stringify(next));
+        // Hold the stream right away (waitUntil allows ~30 s); the cron takes over after.
+        ctx.waitUntil(
+          waitForTerminal(env, agentId, Date.now() + 28_000)
+            .then((status) => (status ? notifyRunEnded(env, agentId, status) : false))
+            .catch(logError),
+        );
+        return json({ ok: true });
+      }
       case 'POST /test': {
         const result = await sendPush(env, {
           title: 'Cursor Mobile',
@@ -79,6 +102,35 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * For agents the app asked us to watch: look at the latest run directly. Finished runs are
+ * notified (deduped per run) and dropped; running ones are added to the stream-watch set.
+ */
+async function checkWatched(env: Env, running: Map<string, string | undefined>) {
+  const list = (await env.STATE.get<WatchEntry[]>(WATCH_KEY, 'json')) ?? [];
+  if (!list.length) return list;
+  const keep: WatchEntry[] = [];
+  for (const w of list.slice(0, 10)) {
+    if (w.until < Date.now()) continue;
+    try {
+      const agent = await cursor.agent(env, w.id);
+      const run = agent.latestRunId ? await cursor.run(env, w.id, agent.latestRunId) : null;
+      if (run && isTerminal(run.status)) {
+        await notifyRunEnded(env, w.id, run.status, agent.name);
+      } else {
+        keep.push(w);
+        if (!running.has(w.id)) running.set(w.id, agent.name);
+      }
+    } catch (e) {
+      logError(e);
+      keep.push(w);
+    }
+  }
+  keep.push(...list.slice(10));
+  if (keep.length !== list.length) await env.STATE.put(WATCH_KEY, JSON.stringify(keep));
+  return keep;
+}
 
 /** Optional: Cursor v0 webhooks (`webhook: { url, secret }` on agent creation). */
 async function handleWebhook(req: Request, env: Env) {

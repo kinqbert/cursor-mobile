@@ -106,6 +106,16 @@ export async function disconnectWorker() {
   kv.remove(REGISTERED);
 }
 
+/**
+ * Ask the worker to watch this agent right away, so even runs shorter than a minute
+ * (which the per-minute check could miss) get a notification. Fire-and-forget.
+ */
+export function watchAgent(agentId: string) {
+  getWorkerConfig()
+    .then((cfg) => (cfg ? workerCall(cfg, '/watch', { agentId }) : null))
+    .catch(() => undefined);
+}
+
 export async function sendTestNotification() {
   const cfg = await getWorkerConfig();
   if (!cfg) throw new Error('Connect the notification worker first.');

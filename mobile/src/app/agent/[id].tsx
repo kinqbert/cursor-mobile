@@ -40,6 +40,7 @@ import { agentPhase, duration, relativeTime, repoName, resultFingerprint } from 
 import { useHasGithub } from '@/lib/github';
 import { useAgentSummary, useArchiveAgent } from '@/lib/hooks';
 import { useSeen } from '@/lib/local-state';
+import { watchAgent } from '@/lib/notifications';
 import { qk } from '@/lib/query';
 import { type LiveItem, useAgentStream } from '@/lib/use-agent-stream';
 import { radius, space, useColors } from '@/theme';
@@ -135,6 +136,7 @@ export default function AgentScreen() {
       setPendingRun(true);
     }
     setPendingMessages((p) => [...p, text]);
+    watchAgent(id);
     atBottom.current = true;
     qc.invalidateQueries({ queryKey: qk.agent(id) });
   };

@@ -16,6 +16,7 @@ import { repoName } from '@/lib/format';
 import { useModels } from '@/lib/hooks';
 import { MAX_IMAGES, pickImages, type PickedImage } from '@/lib/images';
 import { useComposerPrefs } from '@/lib/local-state';
+import { watchAgent } from '@/lib/notifications';
 import { qk } from '@/lib/query';
 import { useDictation } from '@/lib/voice';
 import { fonts, radius, space, useColors } from '@/theme';
@@ -82,6 +83,7 @@ export default function NewAgent() {
         autoCreatePR: mode === 'agent',
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      watchAgent(res.agent.id);
       qc.invalidateQueries({ queryKey: qk.agents });
       router.dismiss();
       router.push({ pathname: '/agent/[id]', params: { id: res.agent.id, prompt: text.trim() } });
