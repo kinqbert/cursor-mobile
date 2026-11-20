@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Cursor Mobile",
+    "slug": "cursor-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "cursormobile",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F8F8F6",
+    "android": {
+      "package": "com.kinqbert.cursormobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#F8F8F6",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F8F8F6",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76,
+          "dark": { "backgroundColor": "#0E0E0E" }
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone for voice prompts.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to transcribe voice prompts."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to attach photos to prompts.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to attach photos to prompts."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
