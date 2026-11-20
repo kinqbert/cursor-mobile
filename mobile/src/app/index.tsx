@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AgentRow } from '@/components/agents/agent-row';
+import { SwipeableRow } from '@/components/agents/swipeable-row';
 import { ComposerBar } from '@/components/composer/composer-bar';
 import { ActionMenu, type MenuItem } from '@/components/ui/action-menu';
 import { PillButton } from '@/components/ui/pill-button';
@@ -168,13 +169,20 @@ function AgentsHome() {
           </Text>
         )}
         renderItem={({ item, index, section }) => (
-          <AgentRow
-            agent={item}
-            unread={isUnread(item)}
-            last={index === section.data.length - 1}
-            onPress={openAgent}
-            onLongPress={setMenuAgent}
-          />
+          <SwipeableRow
+            pinned={isPinned(item.id)}
+            onPin={() => toggle(item.id)}
+            onArchive={() => archive.mutate(item.id)}>
+            <View style={{ backgroundColor: colors.background }}>
+              <AgentRow
+                agent={item}
+                unread={isUnread(item)}
+                last={index === section.data.length - 1}
+                onPress={openAgent}
+                onLongPress={setMenuAgent}
+              />
+            </View>
+          </SwipeableRow>
         )}
         ListEmptyComponent={
           agents.isLoading ? (

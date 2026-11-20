@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase (kept out of git; use an EAS file env var for cloud builds)
+google-services.json

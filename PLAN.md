@@ -45,19 +45,18 @@ The v1 API has **no webhooks yet** (only v0 has them, and they only fire on FINI
 webhook URL). Instead, the Worker watches agents itself. This covers **every** agent, including ones started from desktop, web or Slack:
 
 ```
-Cron (every 1 min) ─▶ Worker: GET /v1/agents ─▶ new ACTIVE agent? ─▶ Durable Object "watcher" per agent
-                                                                      │ holds GET /v1/agents/{id}/stream (SSE)
-                                                                      ▼ status FINISHED / ERROR (instant)
-                                    Get run + GitHub PR stats ─▶ Expo Push ─▶ FCM ─▶ phone
+Cron (every minute, holds ~55 s)
+ ├─ GET /v0/agents → diff vs KV → agent stopped working? ─────────────┐   (fallback, ≤60 s)
+ ├─ set of running agents changed? → silent "N Active" (tag-replaced) │
+ └─ for each running agent: hold GET /v1/agents/{id}/stream ──────────┤   (instant)
+                                                                      ▼
+                     notifyRunEnded (dedupe per run id) → Expo Push → FCM → phone
 ```
 
-- Finish/error notifications arrive within seconds. A newly started agent is picked up within 60 s, which only matters for the "active" counter.
-- Fallback: if long-lived SSE in a Durable Object proves flaky, cron diffing alone gives ≤60 s latency.
-- `/webhook` endpoint (HMAC `X-Webhook-Signature` check) kept ready for when v1 gets webhooks.
-- `/register` endpoint: the app posts its Expo push token, authenticated with a shared secret.
-- Notification content: title = agent name, body = `Finished · +80 -230 · 3 files` or `Failed: <reason>`; action button **Review**; tap → deep link `cursormobile://agent/{id}`.
-- "N Active" ongoing notification: data-only push → background task updates a local ongoing notification (Live Activity equivalent).
-- "Needs input": the API has no such status today. Plan-mode runs that finish are sent as "Plan ready".
+- Durable Objects were dropped: a per-minute cron holding the streams for 55 s gives near-continuous coverage with less moving parts.
+- `/webhook` (HMAC `X-Webhook-Signature`) is kept ready for when v1 gets webhooks. `/register`, `/unregister`, `/test`, `/health` are authenticated with `APP_SECRET`.
+- Notification: title = agent name, body = `Finished · +80 −230 · 3 files` + first line of the result. Actions: **Review PR** / **Open agent**. Tap → deep link into the app.
+- "Needs input": the API has no such status today.
 
 ## 5. API mapping (Cloud Agents API v1, `https://api.cursor.com`, Bearer key)
 
@@ -87,6 +86,8 @@ prompt and final `result`. Spike: check whether `GET /v0/agents/{id}/conversatio
 - Home-screen widget with the active agents (phase 8).
 
 ## 7. Phases
+
+Status (2026-11-21): phases 0–7 are implemented and pushed. Phase 0 still needs the account setup in README, and the app hasn't been tested on a device yet. Phase 8 is open.
 
 **Phase 0: Environment (½ day)**
 Install Node (Homebrew). Create Expo, Firebase and Cloudflare accounts. `create-expo-app`, first EAS dev build, install it on the phone, live reload working.
