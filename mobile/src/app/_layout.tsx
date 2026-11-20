@@ -14,6 +14,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { useNotificationRouting } from '@/lib/notifications';
 import { queryClient } from '@/lib/query';
 import { useColors, useIsDark } from '@/theme';
 
@@ -44,6 +45,8 @@ function RootStack({ fontsLoaded }: { fontsLoaded: boolean }) {
   useEffect(() => {
     if (ready && fontsLoaded) SplashScreen.hideAsync();
   }, [ready, fontsLoaded]);
+
+  useNotificationRouting(ready && fontsLoaded && signedIn);
 
   if (!ready || !fontsLoaded) return null;
 

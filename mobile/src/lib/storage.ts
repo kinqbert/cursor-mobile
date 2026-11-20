@@ -5,6 +5,8 @@ import KV from 'expo-sqlite/kv-store';
 const SECRET_KEYS = {
   cursorApiKey: 'cursor_api_key',
   githubToken: 'github_token',
+  workerUrl: 'worker_url',
+  workerSecret: 'worker_secret',
 } as const;
 
 export type SecretName = keyof typeof SECRET_KEYS;

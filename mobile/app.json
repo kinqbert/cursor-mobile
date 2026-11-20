@@ -11,7 +11,7 @@
     "android": {
       "package": "com.kinqbert.cursormobile",
       "adaptiveIcon": {
-        "backgroundColor": "#F8F8F6",
+        "backgroundColor": "#1C1C1B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -26,8 +26,11 @@
         {
           "backgroundColor": "#F8F8F6",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
-          "dark": { "backgroundColor": "#0E0E0E" }
+          "imageWidth": 72,
+          "dark": {
+            "backgroundColor": "#0E0E0E",
+            "image": "./assets/images/splash-icon-dark.png"
+          }
         }
       ],
       "expo-secure-store",
@@ -44,6 +47,14 @@
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to attach photos to prompts.",
           "cameraPermission": "Allow $(PRODUCT_NAME) to attach photos to prompts."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1C1C1B",
+          "defaultChannel": "agents"
         }
       ]
     ],

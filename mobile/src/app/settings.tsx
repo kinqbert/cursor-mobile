@@ -5,6 +5,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { PillButton } from '@/components/ui/pill-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { NotificationsSection } from '@/components/settings/notifications-section';
 import { SecretField } from '@/components/ui/secret-field';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth';
@@ -55,6 +56,12 @@ export default function Settings() {
               }}
             />
           )}
+        </Section>
+
+        <Section
+          title="Notifications"
+          hint="Instant alerts when agents finish or fail, plus a silent “N Active” summary. Paste the URL of your deployed worker and the APP_SECRET you set on it.">
+          <NotificationsSection />
         </Section>
 
         <PillButton
