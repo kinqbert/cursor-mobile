@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cursor } from './api/endpoints';
 import type { AgentV0, Repository } from './api/types';
@@ -9,7 +9,18 @@ import { kv } from './storage';
 export function useAgents() {
   return useQuery({
     queryKey: qk.agents,
-    queryFn: () => cursor.listAgents().then((r) => r.agents),
+    queryFn: async () => {
+      // v0 has repo/status/PR; v1 has updatedAt. Fetch both in parallel and merge, then
+      // order by last activity (like the iOS app) instead of creation time.
+      const [v0, v1] = await Promise.all([
+        cursor.listAgents(undefined, 50).then((r) => r.agents),
+        cursor.listAgentsV1(50).catch(() => []),
+      ]);
+      const updated = new Map(v1.map((a) => [a.id, a.updatedAt]));
+      return v0
+        .map((a) => ({ ...a, updatedAt: updated.get(a.id) ?? a.createdAt }))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    },
     // Poll faster while something is running.
     refetchInterval: (q) =>
       q.state.data?.some((a) => agentPhase(a.status) === 'working') ? 8_000 : 30_000,
@@ -24,6 +35,12 @@ export function useAgentSummary(id: string) {
     initialData: () => qc.getQueryData<AgentV0[]>(qk.agents)?.find((a) => a.id === id),
     refetchInterval: (q) => (q.state.data && agentPhase(q.state.data.status) === 'working' ? 5_000 : false),
   });
+}
+
+/** Warm the cache for an agent screen (conversation + run metadata). */
+export function prefetchAgent(qc: QueryClient, id: string) {
+  qc.prefetchQuery({ queryKey: qk.conversation(id), queryFn: () => cursor.conversation(id), staleTime: 10_000 });
+  qc.prefetchQuery({ queryKey: qk.agent(id), queryFn: () => cursor.agent(id), staleTime: 10_000 });
 }
 
 export function useModels() {

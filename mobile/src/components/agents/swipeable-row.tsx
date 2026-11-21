@@ -24,9 +24,14 @@ export function SwipeableRow({ children, pinned, onPin, onArchive }: Props) {
   return (
     <ReanimatedSwipeable
       ref={ref}
-      friction={1.6}
-      leftThreshold={72}
-      rightThreshold={72}
+      // Only a deliberate, mostly-horizontal swipe should trigger: the gesture activates
+      // after 36 px sideways (vertical scrolling claims the touch first), and the action
+      // needs a ~40% swipe before release.
+      dragOffsetFromLeft={36}
+      dragOffsetFromRight={-36}
+      friction={2}
+      leftThreshold={150}
+      rightThreshold={150}
       overshootLeft={false}
       overshootRight={false}
       renderLeftActions={(progress) => (

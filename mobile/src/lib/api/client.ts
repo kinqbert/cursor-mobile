@@ -41,6 +41,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   for (const [k, v] of Object.entries(opts.query ?? {})) {
     if (v !== undefined) url.searchParams.set(k, String(v));
   }
+  const started = Date.now();
   const res = await fetch(url.toString(), {
     method: opts.method ?? 'GET',
     headers: {
@@ -53,6 +54,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
   const text = await res.text();
   const json = text ? safeJson(text) : undefined;
+  if (__DEV__) console.log(`[api] ${opts.method ?? 'GET'} ${path} → ${res.status} in ${Date.now() - started} ms`);
 
   if (!res.ok) {
     const err = (json as { error?: { code?: string; message?: string }; message?: string }) ?? {};

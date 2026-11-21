@@ -213,6 +213,15 @@ export default function AgentScreen() {
           {conversation.isLoading && !pendingMessages.length ? (
             <ActivityIndicator color={colors.textSecondary} style={{ marginTop: space.xxl }} />
           ) : null}
+          {!working && !pendingMessages.length && (conversation.isError || (conversation.isSuccess && !history.length)) ? (
+            <Pressable onPress={() => conversation.refetch()}>
+              <Text variant="caption" color="textTertiary">
+                {conversation.isError
+                  ? `Couldn't load the conversation: ${(conversation.error as Error).message}. Tap to retry.`
+                  : 'Cursor no longer provides the transcript for this agent, so your prompt can’t be shown. The final result is below.'}
+              </Text>
+            </Pressable>
+          ) : null}
           {history.map((m) => (
             <Message key={m.id} message={m} />
           ))}
@@ -225,7 +234,8 @@ export default function AgentScreen() {
           ) : s ? (
             <Text variant="meta" color={phase === 'error' ? 'danger' : 'textSecondary'}>
               {phaseLabel(phase)}
-              {run.data?.durationMs ? ` ${duration(run.data.durationMs)}` : ` · ${relativeTime(s.createdAt)}`}
+              {phase === 'finished' && run.data?.durationMs ? ` in ${duration(run.data.durationMs)}` : ''}
+              {` · ${relativeTime(agent.data?.updatedAt ?? s.updatedAt ?? s.createdAt)}`}
             </Text>
           ) : null}
 

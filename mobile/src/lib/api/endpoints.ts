@@ -28,6 +28,9 @@ export const cursor = {
       query: { limit, cursor: cursorParam },
     }),
 
+  listAgentsV1: (limit = 100) =>
+    api<{ items: AgentV1[]; nextCursor?: string }>('/v1/agents', { query: { limit } }).then((r) => r.items),
+
   agentV0: (id: string) => api<AgentV0>(`/v0/agents/${id}`),
   agent: (id: string) => api<AgentV1>(`/v1/agents/${id}`),
   conversation: (id: string) =>

@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { setApiKey, setUnauthorizedHandler } from './api/client';
+import { persister, queryClient } from './query';
 import { cursor } from './api/endpoints';
 import type { ApiKeyInfo } from './api/types';
 import { kv, secrets } from './storage';
@@ -33,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await secrets.remove('cursorApiKey');
     kv.remove(ACCOUNT_KEY);
     setApiKey(null);
+    queryClient.clear();
+    persister.removeClient();
     setAccount(null);
     setSignedIn(false);
   }, []);

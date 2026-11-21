@@ -14,10 +14,11 @@ type Props = {
   unread: boolean;
   last?: boolean;
   onPress: (agent: AgentV0) => void;
+  onPressIn?: (agent: AgentV0) => void;
   onLongPress: (agent: AgentV0) => void;
 };
 
-export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, onLongPress }: Props) {
+export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, onPressIn, onLongPress }: Props) {
   const colors = useColors();
   const phase = agentPhase(agent.status);
   const dot: DotState =
@@ -27,6 +28,7 @@ export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, o
   return (
     <Pressable
       onPress={() => onPress(agent)}
+      onPressIn={() => onPressIn?.(agent)}
       onLongPress={() => onLongPress(agent)}
       delayLongPress={300}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfacePressed }]}>
@@ -55,7 +57,7 @@ export const AgentRow = memo(function AgentRow({ agent, unread, last, onPress, o
           )}
           <Text variant="meta" color="textTertiary" numberOfLines={1}>
             {' · '}
-            {relativeTime(agent.createdAt)}
+            {relativeTime(agent.updatedAt ?? agent.createdAt)}
           </Text>
         </View>
       </View>

@@ -11,14 +11,9 @@ import {
   X,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useQueryClient } from '@tanstack/react-query';
+import { ActivityIndicator, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AgentRow } from '@/components/agents/agent-row';
@@ -31,8 +26,8 @@ import { Text } from '@/components/ui/text';
 import type { AgentV0 } from '@/lib/api/types';
 import { useAuth } from '@/lib/auth';
 import { agentPhase, isSameDay, repoName, resultFingerprint } from '@/lib/format';
-import { useAgents, useArchiveAgent } from '@/lib/hooks';
-import { usePins, useSeen } from '@/lib/local-state';
+import { prefetchAgent, useAgents, useArchiveAgent } from '@/lib/hooks';
+import { unreadBaseline, usePins, useSeen } from '@/lib/local-state';
 import { fonts, radius, space, useColors } from '@/theme';
 
 type Filter = 'all' | 'working' | 'done' | 'failed';
@@ -63,12 +58,17 @@ function AgentsHome() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [menuAgent, setMenuAgent] = useState<AgentV0 | null>(null);
 
+  const qc = useQueryClient();
+  // Agents whose last activity predates the app install count as already seen.
   const isUnread = useCallback(
-    (a: AgentV0) => agentPhase(a.status) !== 'working' && seen[a.id] !== resultFingerprint(a),
+    (a: AgentV0) =>
+      agentPhase(a.status) !== 'working' &&
+      (a.updatedAt ?? a.createdAt) > unreadBaseline() &&
+      seen[a.id] !== resultFingerprint(a),
     [seen],
   );
 
-  const sections = useMemo(() => {
+  const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = (agents.data ?? []).filter((a) => {
       if (q && !`${a.name} ${a.source?.repository ?? ''}`.toLowerCase().includes(q)) return false;
@@ -78,7 +78,7 @@ function AgentsHome() {
       if (filter === 'failed') return phase === 'error' || phase === 'expired';
       return true;
     });
-    return groupAgents(list, pinned);
+    return flatten(groupAgents(list, pinned));
   }, [agents.data, query, filter, pinned]);
 
   const menuItems: MenuItem[] = menuAgent
@@ -106,6 +106,8 @@ function AgentsHome() {
     : [];
 
   const openAgent = useCallback((a: AgentV0) => router.push(`/agent/${a.id}`), []);
+  // Start loading the conversation on touch-down, ~100–200 ms before the tap completes.
+  const warmAgent = useCallback((a: AgentV0) => prefetchAgent(qc, a.id), [qc]);
 
   const header = (
     <View>
@@ -148,11 +150,11 @@ function AgentsHome() {
 
   return (
     <View style={{ flex: 1 }}>
-      <SectionList
-        sections={sections}
-        keyExtractor={(a) => a.id}
+      <FlashList
+        data={rows}
+        keyExtractor={(r) => r.key}
+        getItemType={(r) => r.kind}
         ListHeaderComponent={header}
-        stickySectionHeadersEnabled={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -163,27 +165,29 @@ function AgentsHome() {
             progressViewOffset={insets.top}
           />
         }
-        renderSectionHeader={({ section }) => (
-          <Text variant="section" color="textSecondary" style={styles.sectionHeader}>
-            {section.title}
-          </Text>
-        )}
-        renderItem={({ item, index, section }) => (
-          <SwipeableRow
-            pinned={isPinned(item.id)}
-            onPin={() => toggle(item.id)}
-            onArchive={() => archive.mutate(item.id)}>
-            <View style={{ backgroundColor: colors.background }}>
-              <AgentRow
-                agent={item}
-                unread={isUnread(item)}
-                last={index === section.data.length - 1}
-                onPress={openAgent}
-                onLongPress={setMenuAgent}
-              />
-            </View>
-          </SwipeableRow>
-        )}
+        renderItem={({ item }) =>
+          item.kind === 'header' ? (
+            <Text variant="section" color="textSecondary" style={styles.sectionHeader}>
+              {item.title}
+            </Text>
+          ) : (
+            <SwipeableRow
+              pinned={isPinned(item.agent.id)}
+              onPin={() => toggle(item.agent.id)}
+              onArchive={() => archive.mutate(item.agent.id)}>
+              <View style={{ backgroundColor: colors.background }}>
+                <AgentRow
+                  agent={item.agent}
+                  unread={isUnread(item.agent)}
+                  last={item.last}
+                  onPress={openAgent}
+                  onPressIn={warmAgent}
+                  onLongPress={setMenuAgent}
+                />
+              </View>
+            </SwipeableRow>
+          )
+        }
         ListEmptyComponent={
           agents.isLoading ? (
             <ActivityIndicator style={{ marginTop: 64 }} color={colors.textSecondary} />
@@ -233,6 +237,20 @@ function AgentsHome() {
 }
 
 type Section = { title: string; data: AgentV0[] };
+type Row =
+  | { kind: 'header'; key: string; title: string }
+  | { kind: 'agent'; key: string; agent: AgentV0; last: boolean };
+
+function flatten(sections: Section[]): Row[] {
+  const rows: Row[] = [];
+  for (const sec of sections) {
+    rows.push({ kind: 'header', key: `h:${sec.title}`, title: sec.title });
+    sec.data.forEach((agent, i) =>
+      rows.push({ kind: 'agent', key: agent.id, agent, last: i === sec.data.length - 1 }),
+    );
+  }
+  return rows;
+}
 
 /** Pinned → Today → one section per repo (most recent first), like the iOS app. */
 function groupAgents(list: AgentV0[], pinned: string[]): Section[] {
@@ -246,7 +264,7 @@ function groupAgents(list: AgentV0[], pinned: string[]): Section[] {
 
   for (const a of list) {
     if (pinnedSet.has(a.id)) continue;
-    if (isSameDay(new Date(a.createdAt), now) || agentPhase(a.status) === 'working') {
+    if (isSameDay(new Date(a.updatedAt ?? a.createdAt), now) || agentPhase(a.status) === 'working') {
       today.push(a);
       continue;
     }

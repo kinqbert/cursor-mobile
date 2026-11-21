@@ -28,6 +28,11 @@ const seen = createPersisted<Record<string, string>>('seen', {});
 export type ComposerPrefs = { repo?: string; branch?: string; modelId?: string; mode?: 'agent' | 'plan' };
 const composerPrefs = createPersisted<ComposerPrefs>('composer-prefs', {});
 
+// Set once on first launch: older activity never shows as "unread".
+const baseline = createPersisted<string | null>('unread-baseline', null);
+if (!baseline.get()) baseline.set(new Date().toISOString());
+export const unreadBaseline = () => baseline.get() ?? '';
+
 export function usePins() {
   const list = useSyncExternalStore(pins.subscribe, pins.get);
   return {

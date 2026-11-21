@@ -99,6 +99,8 @@ export type AgentV0 = {
   };
   summary?: string;
   createdAt: string;
+  /** Merged in from the v1 list (v0 has no updatedAt). */
+  updatedAt?: string;
 };
 
 export type ConversationMessage = {
